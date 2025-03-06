@@ -163,6 +163,37 @@ app.post('/transfer', authenticateToken, async (req, res) => {
     }
 });
 
+// Deposit Money
+app.post('/account/deposit', authenticateToken, async (req, res) => {
+    const { accountId, amount } = req.body;
+
+    if (!accountId || !amount || amount <= 0) {
+        return res.status(400).json({ message: 'Invalid deposit details' });
+    }
+
+    try {
+        // Update the account balance
+        const [result] = await connection.promise().query(
+            'UPDATE accounts SET balance = balance + ? WHERE id = ?',
+            [amount, accountId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Account not found' });
+        }
+
+        // Log the deposit transaction
+        await connection.promise().query(
+            'INSERT INTO transactions (from_account, to_account, amount, type) VALUES (?, ?, ?, ?)',
+            [accountId, accountId, amount, 'deposit']
+        );
+
+        res.json({ message: 'Deposit successful', amount });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
